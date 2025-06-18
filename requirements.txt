@@ -12,7 +12,6 @@ decorator==5.2.1
 executing==2.2.0
 frozenlist==1.7.0
 idna==3.10
-ipython==9.3.0
 ipython_pygments_lexers==1.1.1
 jedi==0.19.2
 multidict==6.5.0
