@@ -1,4 +1,3 @@
-
 from threading import Thread
 import requests
 import pandas as pd
@@ -6,8 +5,7 @@ import ta
 import schedule
 import time
 from datetime import datetime
-
-
+import pytz
 
 # === TELEGRAM CONFIG ===
 TELEGRAM_TOKEN = '7510157645:AAEuMk6ymG1JWIW1wQXCGqkLb_xdjXxEFnA'
@@ -16,6 +14,12 @@ CHAT_ID = '6849082725'
 # === TRACK LAST SIGNALS ===
 last_signals = {}
 
+# === TIME HELPER ===
+def format_singapore_time():
+    sg_timezone = pytz.timezone("Asia/Singapore")
+    return datetime.now(sg_timezone).strftime('%Y-%m-%d %H:%M')
+
+# === TELEGRAM SEND ===
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": message}
@@ -86,7 +90,7 @@ def check_signals(symbol, df):
         messages.append("✔️ Rising Volatility")
 
     if bull_count >= 4:
-        return f"🚀 [BULL RUN DETECTED] {symbol} @ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n" + "\n".join(messages)
+        return f"🚀 [BULL RUN DETECTED] {symbol} @ {format_singapore_time()} | Price: ${latest['close']:.4f}\n" + "\n".join(messages)
 
     # Reset messages
     messages = []
@@ -112,23 +116,22 @@ def check_signals(symbol, df):
         messages.append("❌ Rising Volatility")
 
     if bear_count >= 4:
-        return f"📉 [BEAR RUN DETECTED] {symbol} @ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n" + "\n".join(messages)
+        return f"📉 [BEAR RUN DETECTED] {symbol} @ {format_singapore_time()} | Price: ${latest['close']:.4f}\n" + "\n".join(messages)
 
     return None
 
 # === JOB LOOP ===
 def job():
     global last_signals
-    print(f"Running check at {datetime.now()}")
+    print(f"Running check at {format_singapore_time()}")
     symbols = get_top_binance_symbols()
 
     for symbol in symbols:
         try:
             df = fetch_price_data(symbol)
             df.name = symbol
-            signal = check_signals(symbol,df)
+            signal = check_signals(symbol, df)
 
-            # Convert signal into a short code for memory (bull/bear/none)
             if signal:
                 if "BULL" in signal:
                     current_signal = "bull"
@@ -139,10 +142,6 @@ def job():
             else:
                 current_signal = None
 
-            # Combine type + message for tracking
-            combined_signal = (current_signal, signal)
-
-            # Send message only if signal changes
             if last_signals.get(symbol) != current_signal:
                 last_signals[symbol] = current_signal
                 if signal:
@@ -150,12 +149,12 @@ def job():
         except Exception as e:
             print(f"Error for {symbol}: {e}")
 
-
+# === SCHEDULE ===
 schedule.every(15).minutes.do(job)
 
 if __name__ == "__main__":
-  print("Bot started... 🚀")
-  job()  # ← Add this line to run once right now
-  while True:
-      schedule.run_pending()
-      time.sleep(1)
+    print("Bot started... 🚀")
+    job()  # Run immediately once
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
