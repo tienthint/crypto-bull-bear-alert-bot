@@ -1,3 +1,5 @@
+
+from threading import Thread
 import requests
 import pandas as pd
 import ta
@@ -5,9 +7,14 @@ import schedule
 import time
 from datetime import datetime
 
+
+
 # === TELEGRAM CONFIG ===
 TELEGRAM_TOKEN = '7510157645:AAEuMk6ymG1JWIW1wQXCGqkLb_xdjXxEFnA'
 CHAT_ID = '6849082725'
+
+# === TRACK LAST SIGNALS ===
+last_signals = {}
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -78,7 +85,7 @@ def check_signals(symbol, df):
         bull_count += 1
         messages.append("✔️ Rising Volatility")
 
-    if bull_count >= 3:
+    if bull_count >= 4:
         return f"🚀 [BULL RUN DETECTED] {symbol} @ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n" + "\n".join(messages)
 
     # Reset messages
@@ -104,7 +111,7 @@ def check_signals(symbol, df):
         bear_count += 1
         messages.append("❌ Rising Volatility")
 
-    if bear_count >= 3:
+    if bear_count >= 4:
         return f"📉 [BEAR RUN DETECTED] {symbol} @ {datetime.now().strftime('%Y-%m-%d %H:%M')}\n" + "\n".join(messages)
 
     return None
@@ -119,18 +126,21 @@ def job():
         try:
             df = fetch_price_data(symbol)
             df.name = symbol
-            signal = check_signals(df)
+            signal = check_signals(symbol,df)
 
             # Convert signal into a short code for memory (bull/bear/none)
             if signal:
-                if "Bull run" in signal:
+                if "BULL" in signal:
                     current_signal = "bull"
-                elif "Bear run" in signal:
+                elif "BEAR" in signal:
                     current_signal = "bear"
                 else:
                     current_signal = "unknown"
             else:
                 current_signal = None
+
+            # Combine type + message for tracking
+            combined_signal = (current_signal, signal)
 
             # Send message only if signal changes
             if last_signals.get(symbol) != current_signal:
@@ -144,7 +154,8 @@ def job():
 schedule.every(15).minutes.do(job)
 
 if __name__ == "__main__":
-    print("Bot started... 🚀")
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+  print("Bot started... 🚀")
+  job()  # ← Add this line to run once right now
+  while True:
+      schedule.run_pending()
+      time.sleep(1)
