@@ -1,9 +1,6 @@
-from threading import Thread
 import requests
 import pandas as pd
 import ta
-import schedule
-import time
 from datetime import datetime
 import pytz
 
@@ -11,21 +8,18 @@ import pytz
 TELEGRAM_TOKEN = '7510157645:AAEuMk6ymG1JWIW1wQXCGqkLb_xdjXxEFnA'
 CHAT_ID = '6849082725'
 
-# === TRACK LAST SIGNALS ===
+# === TRACK LAST SIGNALS IN MEMORY (OPTIONAL: Persist if needed) ===
 last_signals = {}
 
-# === TIME HELPER ===
 def format_singapore_time():
     sg_timezone = pytz.timezone("Asia/Singapore")
     return datetime.now(sg_timezone).strftime('%Y-%m-%d %H:%M')
 
-# === TELEGRAM SEND ===
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": message}
     requests.post(url, data=data)
 
-# === FETCH TOP 10 SYMBOLS BY VOLUME ===
 def get_top_binance_symbols(limit=10):
     url = "https://api.binance.com/api/v3/ticker/24hr"
     tickers = requests.get(url).json()
@@ -33,7 +27,6 @@ def get_top_binance_symbols(limit=10):
     sorted_pairs = sorted(spot_pairs, key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in sorted_pairs[:limit]]
 
-# === FETCH PRICE DATA ===
 def fetch_price_data(symbol="BTCUSDT", interval="15m", limit=200):
     url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
     data = requests.get(url).json()
@@ -47,7 +40,6 @@ def fetch_price_data(symbol="BTCUSDT", interval="15m", limit=200):
     df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
     return df
 
-# === SIGNAL DETECTION ===
 def check_signals(symbol, df):
     try:
         df['ma50'] = df['close'].rolling(window=50).mean()
@@ -69,7 +61,6 @@ def check_signals(symbol, df):
     bull_count = 0
     bear_count = 0
 
-    # Bull rules
     if latest['close'] > latest['ma200']:
         bull_count += 1
         messages.append("✔️ Price > 200 MA")
@@ -92,10 +83,8 @@ def check_signals(symbol, df):
     if bull_count >= 4:
         return f"🚀 [BULL RUN DETECTED] {symbol} @ {format_singapore_time()} | Price: ${latest['close']:.4f}\n" + "\n".join(messages)
 
-    # Reset messages
     messages = []
 
-    # Bear rules
     if latest['close'] < latest['ma200']:
         bear_count += 1
         messages.append("❌ Price < 200 MA")
@@ -120,41 +109,19 @@ def check_signals(symbol, df):
 
     return None
 
-# === JOB LOOP ===
-def job():
-    global last_signals
-    print(f"Running check at {format_singapore_time()}")
+def main():
+    print(f"Running scheduled check @ {format_singapore_time()}")
     symbols = get_top_binance_symbols()
 
     for symbol in symbols:
         try:
             df = fetch_price_data(symbol)
-            df.name = symbol
             signal = check_signals(symbol, df)
 
             if signal:
-                if "BULL" in signal:
-                    current_signal = "bull"
-                elif "BEAR" in signal:
-                    current_signal = "bear"
-                else:
-                    current_signal = "unknown"
-            else:
-                current_signal = None
-
-            if last_signals.get(symbol) != current_signal:
-                last_signals[symbol] = current_signal
-                if signal:
-                    send_telegram_message(f"{symbol}: {signal}")
+                send_telegram_message(f"{symbol}: {signal}")
         except Exception as e:
-            print(f"Error for {symbol}: {e}")
-
-# === SCHEDULE ===
-schedule.every(15).minutes.do(job)
+            print(f"Error processing {symbol}: {e}")
 
 if __name__ == "__main__":
-    print("Bot started... 🚀")
-    job()  # Run immediately once
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    main()
