@@ -22,7 +22,18 @@ def send_telegram_message(message):
 
 def get_top_binance_symbols(limit=10):
     url = "https://api.binance.com/api/v3/ticker/24hr"
-    tickers = requests.get(url).json()
+    response = requests.get(url)
+
+    try:
+        tickers = response.json()
+    except Exception as e:
+        print("❌ Failed to parse Binance response as JSON:", e)
+        return []
+
+    if not isinstance(tickers, list):
+        print("❌ Unexpected response format from Binance:", tickers)
+        return []
+
     spot_pairs = [t for t in tickers if t['symbol'].endswith("USDT") and float(t['quoteVolume']) > 1_000_000]
     sorted_pairs = sorted(spot_pairs, key=lambda x: float(x['quoteVolume']), reverse=True)
     return [t['symbol'] for t in sorted_pairs[:limit]]
