@@ -16,7 +16,7 @@ ipython_pygments_lexers==1.1.1
 jedi==0.19.2
 multidict==6.5.0
 nest-asyncio==1.6.0
-numpy==2.3.0
+numpy
 packaging==25.0
 pandas==2.3.0
 parso==0.8.4
