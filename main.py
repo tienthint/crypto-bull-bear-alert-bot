@@ -1,3 +1,5 @@
+
+
 import requests
 import pandas as pd
 import ta
@@ -11,27 +13,37 @@ CHAT_ID = '6849082725'
 # === TRACK LAST SIGNALS IN MEMORY (OPTIONAL: Persist if needed) ===
 last_signals = {}
 
+
+
+# === TIME HELPER ===
 def format_singapore_time():
     sg_timezone = pytz.timezone("Asia/Singapore")
     return datetime.now(sg_timezone).strftime('%Y-%m-%d %H:%M')
 
+# === TELEGRAM SEND ===
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": message}
-    requests.post(url, data=data)
+    try:
+        response = requests.post(url, data=data)
+        print(f"📨 Telegram response: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"❌ Telegram send error: {e}")
+
+# === TELEGRAM TEST ===
+def test_telegram():
+    send_telegram_message("✅ Test message: Bot is connected and running.")
 
 def get_top_binance_symbols(limit=10):
     url = "https://api.binance.com/api/v3/ticker/24hr"
     response = requests.get(url)
-
     try:
         tickers = response.json()
     except Exception as e:
-        print("❌ Failed to parse Binance response as JSON:", e)
+        print("❌ Failed to parse Binance response:", e)
         return []
-
     if not isinstance(tickers, list):
-        print("❌ Unexpected response format from Binance:", tickers)
+        print("❌ Unexpected Binance response:", tickers)
         return []
 
     spot_pairs = [t for t in tickers if t['symbol'].endswith("USDT") and float(t['quoteVolume']) > 1_000_000]
@@ -54,7 +66,7 @@ def fetch_price_data(symbol="BTCUSDT", interval="15m", limit=200):
 def check_signals(symbol, df):
     try:
         df['ma50'] = df['close'].rolling(window=50).mean()
-        df['ma200'] = df['close'].rolling(window=200).mean()
+        df['ma200'] = df['close'].rolling(window=100).mean()
         df['rsi'] = ta.momentum.RSIIndicator(df['close'], window=14).rsi()
         macd = ta.trend.MACD(df['close'])
         df['macd_diff'] = macd.macd_diff()
@@ -120,8 +132,10 @@ def check_signals(symbol, df):
 
     return None
 
-def main():
-    print(f"Running scheduled check @ {format_singapore_time()}")
+# === MAIN JOB ===
+def job():
+    global last_signals
+    print(f"Running check at {format_singapore_time()}")
     symbols = get_top_binance_symbols()
 
     for symbol in symbols:
@@ -130,9 +144,16 @@ def main():
             signal = check_signals(symbol, df)
 
             if signal:
+                print(f"✅ Signal detected for {symbol}")
                 send_telegram_message(f"{symbol}: {signal}")
-        except Exception as e:
-            print(f"Error processing {symbol}: {e}")
+            else:
+                print(f"ℹ️ No signal for {symbol} at {format_singapore_time()}")
 
+        except Exception as e:
+            print(f"❌ Error for {symbol}: {e}")
+
+# === ENTRY POINT ===
 if __name__ == "__main__":
-    main()
+    print("Bot started... 🚀")
+    test_telegram()  # Send test message on start
+    job()  # Run signal detection once
