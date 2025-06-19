@@ -103,7 +103,7 @@ def check_signals(symbol, df):
         bull_count += 1
         messages.append("✔️ Rising Volatility")
 
-    if bull_count >= 4:
+    if bull_count >= 3:
         return f"🚀 [BULL RUN DETECTED] {symbol} @ {format_singapore_time()} | Price: ${latest['close']:.4f}\n" + "\n".join(messages)
 
     messages = []
@@ -127,7 +127,7 @@ def check_signals(symbol, df):
         bear_count += 1
         messages.append("❌ Rising Volatility")
 
-    if bear_count >= 4:
+    if bear_count >= 3:
         return f"📉 [BEAR RUN DETECTED] {symbol} @ {format_singapore_time()} | Price: ${latest['close']:.4f}\n" + "\n".join(messages)
 
     return None
